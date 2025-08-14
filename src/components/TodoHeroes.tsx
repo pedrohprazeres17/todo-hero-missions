@@ -317,7 +317,7 @@ const TodoHeroes = () => {
         {/* Header */}
         <header className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-2 hero-gradient bg-clip-text text-transparent">
-            ToDo Heroes
+            ToDo List
           </h1>
           <p className="text-lg text-muted-foreground mb-4">
             Organize suas missões e conquiste seus objetivos
