@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Pencil, Trash2, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Task {
@@ -20,8 +20,16 @@ const TodoHeroes = () => {
   const [filter, setFilter] = useState<Filter>('all');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [taskPendingDeleteId, setTaskPendingDeleteId] = useState<number | null>(null);
+  const [taskPendingDeleteText, setTaskPendingDeleteText] = useState('');
+  const [undoTaskData, setUndoTaskData] = useState<Task | null>(null);
+  const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  
   const editInputRef = useRef<HTMLInputElement>(null);
   const newTaskInputRef = useRef<HTMLInputElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // LocalStorage keys
   const TASKS_KEY = 'todoHeroes:v1:tasks';
@@ -124,15 +132,73 @@ const TodoHeroes = () => {
     }
   };
 
-  const deleteTask = (id: number) => {
+  const openDeleteModal = (id: number) => {
     const taskToDelete = tasks.find(t => t.id === id);
     if (!taskToDelete) return;
 
-    if (confirm('Tem certeza que deseja excluir esta missão?')) {
-      const newTasks = tasks.filter(task => task.id !== id);
-      saveTasks(newTasks);
-      toast.success('Missão excluída');
+    setTaskPendingDeleteId(id);
+    setTaskPendingDeleteText(taskToDelete.text);
+    setShowDeleteModal(true);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setTaskPendingDeleteId(null);
+    setTaskPendingDeleteText('');
+    
+    // Return focus to delete button
+    setTimeout(() => {
+      if (deleteButtonRef.current) {
+        deleteButtonRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const confirmDeleteTask = () => {
+    if (!taskPendingDeleteId) return;
+
+    const taskToDelete = tasks.find(t => t.id === taskPendingDeleteId);
+    if (!taskToDelete) return;
+
+    const newTasks = tasks.filter(task => task.id !== taskPendingDeleteId);
+    saveTasks(newTasks);
+    
+    // Store for potential undo
+    setUndoTaskData(taskToDelete);
+    
+    // Show toast with undo option
+    const toastId = toast.success('Missão excluída', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => undoDelete(),
+      },
+      duration: 3000,
+    });
+
+    // Clear undo data after 3 seconds
+    const timeoutId = setTimeout(() => {
+      setUndoTaskData(null);
+    }, 3000);
+    
+    if (undoTimeoutId) clearTimeout(undoTimeoutId);
+    setUndoTimeoutId(timeoutId);
+    
+    closeDeleteModal();
+  };
+
+  const undoDelete = () => {
+    if (!undoTaskData) return;
+
+    const newTasks = [...tasks, undoTaskData].sort((a, b) => a.createdAt - b.createdAt);
+    saveTasks(newTasks);
+    setUndoTaskData(null);
+    
+    if (undoTimeoutId) {
+      clearTimeout(undoTimeoutId);
+      setUndoTimeoutId(null);
     }
+    
+    toast.success('Missão restaurada!');
   };
 
   const startEdit = (id: number, text: string) => {
@@ -167,11 +233,9 @@ const TodoHeroes = () => {
     const completedCount = tasks.filter(t => t.done).length;
     if (completedCount === 0) return;
 
-    if (confirm(`Tem certeza que deseja limpar ${completedCount} missão(ões) concluída(s)?`)) {
-      const newTasks = tasks.filter(task => !task.done);
-      saveTasks(newTasks);
-      toast.success(`${completedCount} missão(ões) concluída(s) removida(s)`);
-    }
+    const newTasks = tasks.filter(task => !task.done);
+    saveTasks(newTasks);
+    toast.success(`${completedCount} missão(ões) concluída(s) removida(s)`);
   };
 
   // Filter tasks based on current filter
@@ -204,6 +268,48 @@ const TodoHeroes = () => {
       cancelEdit();
     }
   };
+
+  const handleModalKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closeDeleteModal();
+    } else if (e.key === 'Enter') {
+      confirmDeleteTask();
+    }
+  };
+
+  // Focus trap for modal
+  useEffect(() => {
+    if (showDeleteModal && modalRef.current) {
+      const focusableElements = modalRef.current.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key === 'Tab') {
+          if (e.shiftKey) {
+            if (document.activeElement === firstElement) {
+              e.preventDefault();
+              lastElement.focus();
+            }
+          } else {
+            if (document.activeElement === lastElement) {
+              e.preventDefault();
+              firstElement.focus();
+            }
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleTabKey);
+      firstElement?.focus();
+
+      return () => {
+        document.removeEventListener('keydown', handleTabKey);
+      };
+    }
+  }, [showDeleteModal]);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -346,9 +452,10 @@ const TodoHeroes = () => {
                         <Pencil size={14} />
                       </Button>
                       <Button
+                        ref={deleteButtonRef}
                         size="icon"
                         variant="ghost"
-                        onClick={() => deleteTask(task.id)}
+                        onClick={() => openDeleteModal(task.id)}
                         className="h-8 w-8 text-muted-foreground hover:text-destructive transition-smooth"
                         aria-label="Excluir missão"
                       >
@@ -376,6 +483,82 @@ const TodoHeroes = () => {
                 className="hero-gradient h-2 rounded-full transition-smooth"
                 style={{ width: `${(completedCount / tasks.length) * 100}%` }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={closeDeleteModal}
+            onKeyDown={handleModalKeyPress}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            aria-describedby="delete-modal-description"
+          >
+            <div
+              ref={modalRef}
+              className="relative w-full max-w-md bg-card rounded-2xl border border-primary/20 shadow-2xl animate-scale-in"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card)/0.95) 100%)',
+                borderImage: 'linear-gradient(135deg, #3B2FBF, #6CA4FF) 1',
+              }}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center gap-3 p-6 pb-4">
+                <div className="p-2 rounded-lg bg-destructive/10">
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                </div>
+                <h2 
+                  id="delete-modal-title" 
+                  className="text-lg font-semibold hero-gradient bg-clip-text text-transparent"
+                >
+                  Excluir missão?
+                </h2>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={closeDeleteModal}
+                  className="ml-auto h-8 w-8 text-muted-foreground hover:text-foreground"
+                  aria-label="Fechar modal"
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="px-6 pb-6">
+                <p 
+                  id="delete-modal-description" 
+                  className="text-sm text-muted-foreground mb-6"
+                >
+                  Tem certeza que deseja excluir a missão{' '}
+                  <span className="font-medium text-foreground truncate inline-block max-w-[200px]">
+                    "{taskPendingDeleteText}"
+                  </span>
+                  ? Esta ação não poderá ser desfeita.
+                </p>
+
+                {/* Modal Actions */}
+                <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={closeDeleteModal}
+                    className="transition-smooth hover:border-primary focus:ring-2 focus:ring-primary"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={confirmDeleteTask}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-2 focus:ring-destructive transition-smooth"
+                  >
+                    Excluir
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
