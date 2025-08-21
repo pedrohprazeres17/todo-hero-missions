@@ -6,7 +6,7 @@ import { Pencil, Trash2, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 /**
- * 📚 CONCEITOS DOM UTILIZADOS NESTE COMPONENTE:
+ * CONCEITOS DOM UTILIZADOS NESTE COMPONENTE:
  * 
  * 1. useRef() -> Referências diretas aos elementos DOM (similar ao document.getElementById)
  * 2. focus() e select() -> Gerenciamento de foco para melhor UX
@@ -39,7 +39,7 @@ const TodoHeroes = () => {
   const [undoTaskData, setUndoTaskData] = useState<Task | null>(null);
   const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null);
   
-  // 📍 MANIPULAÇÃO DOM COM useRef() - Alternativa React ao document.getElementById()
+  // MANIPULAÇÃO DOM COM useRef() - Alternativa React ao document.getElementById()
   // Estas referências permitem acesso direto aos elementos DOM sem quebrar o paradigma React
   const editInputRef = useRef<HTMLInputElement>(null);      // Input de edição inline
   const newTaskInputRef = useRef<HTMLInputElement>(null);   // Input para nova tarefa
@@ -56,7 +56,7 @@ const TodoHeroes = () => {
     loadFilter();
   }, []);
 
-  // 🎯 GERENCIAMENTO DE FOCO COM useEffect()
+  // GERENCIAMENTO DE FOCO COM useEffect()
   // Quando editingId muda, o React re-executa este efeito
   // Usamos editInputRef.current para acessar o elemento DOM diretamente
   useEffect(() => {
@@ -66,7 +66,7 @@ const TodoHeroes = () => {
     }
   }, [editingId]);
 
-  // 💾 WEB API - LOCALSTORAGE PARA PERSISTÊNCIA DE DADOS
+  // WEB API - LOCALSTORAGE PARA PERSISTÊNCIA DE DADOS
   // localStorage é uma Web API nativa do navegador para armazenar dados localmente
   // Os dados persistem mesmo após fechar o navegador (diferente de sessionStorage)
   const loadTasks = () => {
@@ -132,7 +132,7 @@ const TodoHeroes = () => {
     saveTasks(newTasks);
     setNewTaskText('');
     
-    // 🎯 GERENCIAMENTO DE FOCO - Manter produtividade do usuário
+    // GERENCIAMENTO DE FOCO - Manter produtividade do usuário
     // Após adicionar tarefa, foco retorna automaticamente ao input para próxima tarefa
     if (newTaskInputRef.current) {
       newTaskInputRef.current.focus();  // focus() é método nativo do DOM
@@ -167,7 +167,7 @@ const TodoHeroes = () => {
     setTaskPendingDeleteId(null);
     setTaskPendingDeleteText('');
     
-    // 🔄 RETORNA FOCO PARA ELEMENTO ORIGINAL (UX)
+    // RETORNA FOCO PARA ELEMENTO ORIGINAL (UX)
     // Após fechar modal, devolvemos foco para o botão que iniciou a ação
     // setTimeout garante que o modal seja removido do DOM antes de focar
     setTimeout(() => {
@@ -278,7 +278,7 @@ const TodoHeroes = () => {
   const completedCount = tasks.filter(t => t.done).length;
   const hasCompleted = completedCount > 0;
 
-  // ⌨️ EVENT HANDLERS PARA NAVEGAÇÃO POR TECLADO
+  // EVENT HANDLERS PARA NAVEGAÇÃO POR TECLADO
   // Melhora acessibilidade permitindo interação sem mouse
   const handleKeyPress = (e: React.KeyboardEvent, action: () => void) => {
     if (e.key === 'Enter') {  // Detecta tecla Enter
@@ -302,7 +302,7 @@ const TodoHeroes = () => {
     }
   };
 
-  // 🔒 FOCUS TRAP - CONCEITO AVANÇADO DE ACESSIBILIDADE
+  // FOCUS TRAP - CONCEITO AVANÇADO DE ACESSIBILIDADE
   // Prende o foco dentro do modal, essencial para usuários que navegam por teclado
   useEffect(() => {
     if (showDeleteModal && modalRef.current) {
@@ -434,7 +434,7 @@ const TodoHeroes = () => {
               </p>
             </div>
           ) : (
-            // 📋 LISTA SEMÂNTICA COM ROLES ARIA - Acessibilidade para leitores de tela
+            // LISTA SEMÂNTICA COM ROLES ARIA - Acessibilidade para leitores de tela
             <ul role="list" className="space-y-3">
               {filteredTasks.map((task) => (
                 <li
