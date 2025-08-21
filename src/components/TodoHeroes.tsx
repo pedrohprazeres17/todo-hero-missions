@@ -5,6 +5,19 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Pencil, Trash2, CheckCircle2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+/**
+ * 📚 CONCEITOS DOM UTILIZADOS NESTE COMPONENTE:
+ * 
+ * 1. useRef() -> Referências diretas aos elementos DOM (similar ao document.getElementById)
+ * 2. focus() e select() -> Gerenciamento de foco para melhor UX
+ * 3. addEventListener/removeEventListener -> Event listeners nativos do DOM
+ * 4. querySelectorAll() -> Query selectors para encontrar elementos focalizáveis
+ * 5. preventDefault() e stopPropagation() -> Controle de eventos
+ * 6. localStorage -> Web API para persistência de dados no navegador
+ * 7. document.activeElement -> Elemento que possui foco atualmente
+ * 8. ARIA attributes -> Acessibilidade para leitores de tela
+ */
+
 interface Task {
   id: number;
   text: string;
@@ -26,10 +39,12 @@ const TodoHeroes = () => {
   const [undoTaskData, setUndoTaskData] = useState<Task | null>(null);
   const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null);
   
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const newTaskInputRef = useRef<HTMLInputElement>(null);
-  const deleteButtonRef = useRef<HTMLButtonElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
+  // 📍 MANIPULAÇÃO DOM COM useRef() - Alternativa React ao document.getElementById()
+  // Estas referências permitem acesso direto aos elementos DOM sem quebrar o paradigma React
+  const editInputRef = useRef<HTMLInputElement>(null);      // Input de edição inline
+  const newTaskInputRef = useRef<HTMLInputElement>(null);   // Input para nova tarefa
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);  // Botão de deletar (para retorno de foco)
+  const modalRef = useRef<HTMLDivElement>(null);            // Modal (para focus trap)
 
   // LocalStorage keys
   const TASKS_KEY = 'todoHeroes:v1:tasks';
@@ -41,19 +56,24 @@ const TodoHeroes = () => {
     loadFilter();
   }, []);
 
-  // Focus edit input when editing starts
+  // 🎯 GERENCIAMENTO DE FOCO COM useEffect()
+  // Quando editingId muda, o React re-executa este efeito
+  // Usamos editInputRef.current para acessar o elemento DOM diretamente
   useEffect(() => {
     if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+      editInputRef.current.focus();    // Move o foco para o input
+      editInputRef.current.select();   // Seleciona todo o texto para facilitar edição
     }
   }, [editingId]);
 
+  // 💾 WEB API - LOCALSTORAGE PARA PERSISTÊNCIA DE DADOS
+  // localStorage é uma Web API nativa do navegador para armazenar dados localmente
+  // Os dados persistem mesmo após fechar o navegador (diferente de sessionStorage)
   const loadTasks = () => {
     try {
-      const saved = localStorage.getItem(TASKS_KEY);
+      const saved = localStorage.getItem(TASKS_KEY);  // Lê dados do navegador
       if (saved) {
-        setTasks(JSON.parse(saved));
+        setTasks(JSON.parse(saved));                  // Converte JSON string para objeto
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
@@ -73,7 +93,7 @@ const TodoHeroes = () => {
 
   const saveTasks = (newTasks: Task[]) => {
     try {
-      localStorage.setItem(TASKS_KEY, JSON.stringify(newTasks));
+      localStorage.setItem(TASKS_KEY, JSON.stringify(newTasks)); // Salva no navegador
       setTasks(newTasks);
     } catch (error) {
       console.error('Error saving tasks:', error);
@@ -112,9 +132,10 @@ const TodoHeroes = () => {
     saveTasks(newTasks);
     setNewTaskText('');
     
-    // Keep focus on input for productivity
+    // 🎯 GERENCIAMENTO DE FOCO - Manter produtividade do usuário
+    // Após adicionar tarefa, foco retorna automaticamente ao input para próxima tarefa
     if (newTaskInputRef.current) {
-      newTaskInputRef.current.focus();
+      newTaskInputRef.current.focus();  // focus() é método nativo do DOM
     }
 
     toast.success('Missão adicionada com sucesso!');
@@ -146,10 +167,12 @@ const TodoHeroes = () => {
     setTaskPendingDeleteId(null);
     setTaskPendingDeleteText('');
     
-    // Return focus to delete button
+    // 🔄 RETORNA FOCO PARA ELEMENTO ORIGINAL (UX)
+    // Após fechar modal, devolvemos foco para o botão que iniciou a ação
+    // setTimeout garante que o modal seja removido do DOM antes de focar
     setTimeout(() => {
       if (deleteButtonRef.current) {
-        deleteButtonRef.current.focus();
+        deleteButtonRef.current.focus();  // Foco volta para botão 🗑️
       }
     }, 100);
   };
@@ -255,56 +278,63 @@ const TodoHeroes = () => {
   const completedCount = tasks.filter(t => t.done).length;
   const hasCompleted = completedCount > 0;
 
+  // ⌨️ EVENT HANDLERS PARA NAVEGAÇÃO POR TECLADO
+  // Melhora acessibilidade permitindo interação sem mouse
   const handleKeyPress = (e: React.KeyboardEvent, action: () => void) => {
-    if (e.key === 'Enter') {
-      action();
+    if (e.key === 'Enter') {  // Detecta tecla Enter
+      action();               // Executa ação (equivale ao clique)
     }
   };
 
   const handleEditKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      saveEdit();
+      saveEdit();             // Enter = salvar edição
     } else if (e.key === 'Escape') {
-      cancelEdit();
+      cancelEdit();           // Esc = cancelar edição
     }
   };
 
   const handleModalKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      closeDeleteModal();
+      closeDeleteModal();     // Esc = fechar modal
     } else if (e.key === 'Enter') {
-      confirmDeleteTask();
+      confirmDeleteTask();    // Enter = confirmar exclusão
     }
   };
 
-  // Focus trap for modal
+  // 🔒 FOCUS TRAP - CONCEITO AVANÇADO DE ACESSIBILIDADE
+  // Prende o foco dentro do modal, essencial para usuários que navegam por teclado
   useEffect(() => {
     if (showDeleteModal && modalRef.current) {
+      // 🔍 QUERY SELECTOR - Encontra todos elementos focalizáveis dentro do modal
       const focusableElements = modalRef.current.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
       const firstElement = focusableElements[0] as HTMLElement;
       const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
 
+      // 🔄 EVENT LISTENER NATIVO - Captura eventos de teclado
       const handleTabKey = (e: KeyboardEvent) => {
         if (e.key === 'Tab') {
-          if (e.shiftKey) {
+          if (e.shiftKey) {  // Shift+Tab (navegação reversa)
             if (document.activeElement === firstElement) {
-              e.preventDefault();
-              lastElement.focus();
+              e.preventDefault();  // Previne comportamento padrão
+              lastElement.focus();  // Vai para último elemento
             }
-          } else {
+          } else {  // Tab normal (navegação para frente)
             if (document.activeElement === lastElement) {
               e.preventDefault();
-              firstElement.focus();
+              firstElement.focus();  // Volta para primeiro elemento
             }
           }
         }
       };
 
+      // 📎 ADICIONA EVENT LISTENER ao documento
       document.addEventListener('keydown', handleTabKey);
-      firstElement?.focus();
+      firstElement?.focus();  // Foca primeiro elemento ao abrir modal
 
+      // 🧹 CLEANUP - Remove event listener ao desmontar (importante!)
       return () => {
         document.removeEventListener('keydown', handleTabKey);
       };
@@ -404,11 +434,12 @@ const TodoHeroes = () => {
               </p>
             </div>
           ) : (
+            // 📋 LISTA SEMÂNTICA COM ROLES ARIA - Acessibilidade para leitores de tela
             <ul role="list" className="space-y-3">
               {filteredTasks.map((task) => (
                 <li
                   key={task.id}
-                  role="listitem"
+                  role="listitem"  // Define semanticamente como item de lista
                   className={`bg-card rounded-lg p-4 card-shadow hover:card-shadow-hover transition-smooth ${
                     task.done ? 'task-completed' : ''
                   }`}
@@ -418,17 +449,17 @@ const TodoHeroes = () => {
                       checked={task.done}
                       onCheckedChange={() => toggleDone(task.id)}
                       className="transition-fast"
-                      aria-label={`Marcar como ${task.done ? 'pendente' : 'concluída'}`}
+                      aria-label={`Marcar como ${task.done ? 'pendente' : 'concluída'}`}  // Label para leitores de tela
                     />
                     
                     <div className="flex-1 min-w-0">
                       {editingId === task.id ? (
                         <Input
-                          ref={editInputRef}
+                          ref={editInputRef}  // Referência DOM para foco automático
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          onKeyDown={handleEditKeyPress}
-                          onBlur={saveEdit}
+                          onKeyDown={handleEditKeyPress}  // Navegação por teclado
+                          onBlur={saveEdit}               // Salva ao perder foco
                           className="text-sm transition-smooth"
                         />
                       ) : (
@@ -447,12 +478,12 @@ const TodoHeroes = () => {
                         variant="ghost"
                         onClick={() => startEdit(task.id, task.text)}
                         className="h-8 w-8 text-muted-foreground hover:text-primary transition-smooth"
-                        aria-label="Editar missão"
+                        aria-label="Editar missão"  // Accessibility label
                       >
                         <Pencil size={14} />
                       </Button>
                       <Button
-                        ref={deleteButtonRef}
+                        ref={deleteButtonRef}  // Ref para retorno de foco após modal
                         size="icon"
                         variant="ghost"
                         onClick={() => openDeleteModal(task.id)}
@@ -491,17 +522,17 @@ const TodoHeroes = () => {
         {showDeleteModal && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-            onClick={closeDeleteModal}
-            onKeyDown={handleModalKeyPress}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-modal-title"
-            aria-describedby="delete-modal-description"
+            onClick={closeDeleteModal}  // Clique fora fecha modal
+            onKeyDown={handleModalKeyPress}  // Navegação por teclado
+            role="dialog"                    // ARIA role para acessibilidade
+            aria-modal="true"                // Indica que é um modal
+            aria-labelledby="delete-modal-title"      // ID do título (ARIA)
+            aria-describedby="delete-modal-description" // ID da descrição (ARIA)
           >
             <div
-              ref={modalRef}
+              ref={modalRef}  // Referência DOM para focus trap
               className="relative w-full max-w-md bg-card rounded-2xl border border-primary/20 shadow-2xl animate-scale-in"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}  // 🛑 STOP PROPAGATION - Evita fechar modal ao clicar dentro
               style={{
                 background: 'linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card)/0.95) 100%)',
                 borderImage: 'linear-gradient(135deg, #3B2FBF, #6CA4FF) 1',
